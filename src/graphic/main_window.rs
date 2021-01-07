@@ -1,4 +1,4 @@
-use iced::{Container, Element, Length, Sandbox, Settings, Text};
+use iced::{Container, Element, Length, Sandbox, Text};
 
 struct MainWindow {}
 
@@ -33,5 +33,21 @@ impl Sandbox for MainWindow {
 }
 
 pub fn start()  -> iced::Result {
-    MainWindow::run(Settings::default())
+    let window_settings = iced::window::Settings {
+        size: (800_u32, 400_u32),
+        always_on_top: false,
+        resizable: false,
+        decorations: true,
+        transparent: false,
+        min_size: None,
+        max_size: None,
+        icon: None,
+    };
+    MainWindow::run(iced::Settings {
+        flags: (),
+        window: window_settings,
+        default_font: None,
+        antialiasing: false,
+        default_text_size: 12u16,
+    })
 }
