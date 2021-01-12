@@ -1,17 +1,21 @@
-use iced_graphics::{Backend, Defaults, Primitive, Renderer, Font, HorizontalAlignment, VerticalAlignment};
+use iced_graphics::{
+    Backend, Defaults, Font, HorizontalAlignment, Primitive, Renderer, VerticalAlignment,
+};
 use iced_native::{
     layout, mouse, widget::svg::Handle, Background, Color, Element, Hasher, Layout, Length, Point,
-    Rectangle, Size, Vector, Widget
+    Rectangle, Size, Vector, Widget,
 };
+use pleco::core::{sq::SQ, Piece};
 use pleco::Board;
 
 use std::collections::HashMap;
 use std::fs;
+use std::rc::Rc;
 
 pub struct ChessBoard {
     board: Board,
     cells_size: f32,
-    piece_assets: HashMap<String, Handle>,
+    piece_assets: Rc<HashMap<String, Handle>>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -27,7 +31,7 @@ impl ChessBoard {
         }
     }
 
-    fn load_assets() -> HashMap<String, Handle> {
+    fn load_assets() -> Rc<HashMap<String, Handle>> {
         let assets_dir = format!("{}/src/graphic/merida", env!("CARGO_MANIFEST_DIR"));
         let files = fs::read_dir(assets_dir.clone())
             .unwrap_or_else(|e| panic!("Couldn't read directory {}: {}", assets_dir, e))
@@ -46,7 +50,25 @@ impl ChessBoard {
                 svg,
             );
         }
-        res
+        Rc::new(res)
+    }
+
+    fn asset_name_for_piece(piece: &Piece) -> String {
+        match *piece {
+            Piece::WhitePawn => String::from("wP"),
+            Piece::WhiteKnight => String::from("wN"),
+            Piece::WhiteBishop => String::from("wB"),
+            Piece::WhiteRook => String::from("wR"),
+            Piece::WhiteQueen => String::from("wQ"),
+            Piece::WhiteKing => String::from("wK"),
+            Piece::BlackPawn => String::from("bP"),
+            Piece::BlackKnight => String::from("bN"),
+            Piece::BlackBishop => String::from("bB"),
+            Piece::BlackRook => String::from("bR"),
+            Piece::BlackQueen => String::from("bQ"),
+            Piece::BlackKing => String::from("bK"),
+            _ => String::default(),
+        }
     }
 
     fn get_background_primitive(&self, layout: &Layout<'_>) -> Primitive {
@@ -90,7 +112,7 @@ impl ChessBoard {
         res
     }
 
-    fn get_cells_coordinates(&self, layout: &Layout<'_>) -> Vec<Primitive> {
+    fn get_cells_coordinates_primitives(&self, layout: &Layout<'_>) -> Vec<Primitive> {
         let mut res: Vec<Primitive> = Vec::new();
 
         let upper_a_ordinal = 65u8;
@@ -106,14 +128,13 @@ impl ChessBoard {
             let x = self.cells_size * (0.8 + (col as f32));
             let y1 = self.cells_size * 0.2f32;
             let y2 = self.cells_size * 8.7f32;
-            
             let position_1 = layout.bounds().position() + Vector::new(x, y1);
             let position_2 = layout.bounds().position() + Vector::new(x, y2);
             let board_size = Size::new(self.cells_size, self.cells_size);
             let bounds_1 = Rectangle::new(position_1, board_size);
             let bounds_2 = Rectangle::new(position_2, board_size);
 
-            res.push(Primitive::Text{
+            res.push(Primitive::Text {
                 content: content.clone(),
                 color,
                 size,
@@ -123,7 +144,7 @@ impl ChessBoard {
                 bounds: bounds_1,
             });
 
-            res.push(Primitive::Text{
+            res.push(Primitive::Text {
                 content,
                 color,
                 size,
@@ -139,14 +160,13 @@ impl ChessBoard {
             let y = self.cells_size * (0.8 + (row as f32));
             let x1 = self.cells_size * 0.2f32;
             let x2 = self.cells_size * 8.7f32;
-            
             let position_1 = layout.bounds().position() + Vector::new(x1, y);
             let position_2 = layout.bounds().position() + Vector::new(x2, y);
             let board_size = Size::new(self.cells_size, self.cells_size);
             let bounds_1 = Rectangle::new(position_1, board_size);
             let bounds_2 = Rectangle::new(position_2, board_size);
 
-            res.push(Primitive::Text{
+            res.push(Primitive::Text {
                 content: content.clone(),
                 color,
                 size,
@@ -156,7 +176,7 @@ impl ChessBoard {
                 bounds: bounds_1,
             });
 
-            res.push(Primitive::Text{
+            res.push(Primitive::Text {
                 content,
                 color,
                 size,
@@ -165,6 +185,33 @@ impl ChessBoard {
                 vertical_alignment,
                 bounds: bounds_2,
             });
+        }
+
+        res
+    }
+
+    fn get_pieces_primitives(&self, layout: &Layout<'_>) -> Vec<Primitive> {
+        let mut res: Vec<Primitive> = Vec::new();
+
+        for row in 0..8 {
+            let rank = 7 - row;
+            for col in 0..8 {
+                let file = col;
+                let square = SQ(file + 8 * rank);
+                let piece = self.board.piece_at_sq(square);
+                if piece != Piece::None {
+                    let asset_name = ChessBoard::asset_name_for_piece(&piece);
+                    let handle = self.piece_assets.clone()[asset_name.as_str()].clone();
+
+                    let x = self.cells_size * ((col as f32) + 0.5);
+                    let y = self.cells_size * ((row as f32) + 0.5);
+                    let position = layout.bounds().position() + Vector::new(x, y);
+                    let size = Size::new(self.cells_size, self.cells_size);
+                    let bounds = Rectangle::new(position, size);
+
+                    res.push(Primitive::Svg { bounds, handle })
+                }
+            }
         }
 
         res
@@ -210,10 +257,13 @@ where
             res.push(primitive);
         }
 
-        for primitive in self.get_cells_coordinates(&layout) {
+        for primitive in self.get_cells_coordinates_primitives(&layout) {
             res.push(primitive);
         }
-        
+
+        for primitive in self.get_pieces_primitives(&layout) {
+            res.push(primitive);
+        }
         (
             Primitive::Group { primitives: res },
             mouse::Interaction::default(),
