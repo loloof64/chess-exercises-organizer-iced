@@ -23,6 +23,18 @@ struct DragAndDropState {
     active: bool,
     start_cell: Option<[u8; 2]>,
     end_cell: Option<[u8; 2]>,
+    moved_piece: Option<Piece>,
+    moved_piece_location: Option<[f32; 2]>,
+}
+
+impl DragAndDropState {
+    fn reset(&mut self) {
+        self.active = false;
+        self.start_cell = None;
+        self.end_cell = None;
+        self.moved_piece = None;
+        self.moved_piece_location = None;
+    }
 }
 
 pub struct ChessBoard {
@@ -45,6 +57,8 @@ impl ChessBoard {
                 active: false,
                 start_cell: None,
                 end_cell: None,
+                moved_piece: None,
+                moved_piece_location: None,
             },
         }
     }
@@ -299,16 +313,89 @@ impl ChessBoard {
         }
     }
 
-    fn cell_has_player_in_turn_piece(&self, file: u8, rank: u8)  -> bool {
-        let piece_at_square = self.board.piece_at_sq(SQ(file + 8*rank));
+    fn get_move_piece_primitive(&self) -> Option<Primitive> {
+        if let Some(moved_piece) = self.dnd_state.moved_piece {
+            if let Some([x, y]) = self.dnd_state.moved_piece_location {
+                let asset_name = ChessBoard::asset_name_for_piece(&moved_piece);
+                let handle = self.piece_assets.clone()[asset_name.as_str()].clone();
+
+                let position = Point::new(x, y);
+                let size = Size::new(self.cells_size, self.cells_size);
+                let bounds = Rectangle::new(position, size);
+
+                Some(Primitive::Svg { bounds, handle })
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    }
+
+    fn handle_mouse_move(&mut self, x: f32, y: f32, layout: &Layout<'_>) {
+        let self_bounds = layout.bounds();
+        let local_x = x - self_bounds.x;
+        let local_y = y - self_bounds.y;
+        let col = ((local_x - self.cells_size * 0.5) / self.cells_size).floor() as i32;
+        let row = ((local_y - self.cells_size * 0.5) / self.cells_size).floor() as i32;
+        let file = if self.reversed { 7 - col } else { col };
+        let rank = if self.reversed { row } else { 7 - row };
+
+        let out_of_bounds = col < 0 || col > 7 || row < 0 || row > 7;
+        if self.dnd_state.active {
+            if self.dnd_state.start_cell.is_none() {
+                if out_of_bounds {
+                    self.dnd_state.active = false;
+                } else {
+                    let cell_has_player_in_turn_piece =
+                        self.cell_has_player_in_turn_piece(file as u8, rank as u8);
+                    if cell_has_player_in_turn_piece {
+                        self.dnd_state.start_cell = Some([file as u8, rank as u8]);
+                        self.dnd_state.moved_piece =
+                            Some(self.board.piece_at_sq(SQ(file as u8 + 8 * rank as u8)));
+                    } else {
+                        self.dnd_state.active = false;
+                    }
+                }
+            }
+            self.dnd_state.moved_piece_location = Some([x - self.cells_size * 0.5f32, y - self.cells_size * 0.5f32]);
+        }
+        // We do need a different test starting the same way as the previous one.
+        // Because of the special case where dnd_state.active has been reset to false there.
+        if self.dnd_state.active {
+            self.dnd_state.end_cell = if out_of_bounds {
+                None
+            } else {
+                Some([file as u8, rank as u8])
+            };
+        } else {
+            self.dnd_state.end_cell = None;
+        }
+    }
+
+    fn cell_has_player_in_turn_piece(&self, file: u8, rank: u8) -> bool {
+        let piece_at_square = self.board.piece_at_sq(SQ(file + 8 * rank));
         let white_turn = self.board.turn() == Player::White;
-        let white_pieces = vec![Piece::WhitePawn, Piece::WhiteKnight, Piece::WhiteBishop, Piece::WhiteRook, Piece::WhiteQueen, Piece::WhiteKing];
-        let black_pieces = vec![Piece::BlackPawn, Piece::BlackKnight, Piece::BlackBishop, Piece::BlackRook, Piece::BlackQueen, Piece::BlackKing];
+        let white_pieces = vec![
+            Piece::WhitePawn,
+            Piece::WhiteKnight,
+            Piece::WhiteBishop,
+            Piece::WhiteRook,
+            Piece::WhiteQueen,
+            Piece::WhiteKing,
+        ];
+        let black_pieces = vec![
+            Piece::BlackPawn,
+            Piece::BlackKnight,
+            Piece::BlackBishop,
+            Piece::BlackRook,
+            Piece::BlackQueen,
+            Piece::BlackKing,
+        ];
 
         if white_turn {
             white_pieces.contains(&piece_at_square)
-        }
-        else {
+        } else {
             black_pieces.contains(&piece_at_square)
         }
     }
@@ -363,6 +450,10 @@ where
 
         res.push(self.get_player_turn_primitive(&layout));
 
+        if let Some(primitive) = self.get_move_piece_primitive() {
+            res.push(primitive);
+        }
+
         (
             Primitive::Group { primitives: res },
             mouse::Interaction::default(),
@@ -384,46 +475,11 @@ where
                 Status::Captured
             }
             Event::Mouse(MouseEvent::ButtonReleased(MouseButton::Left)) => {
-                self.dnd_state.active = false;
-                self.dnd_state.start_cell = None;
+                self.dnd_state.reset();
                 Status::Captured
             }
             Event::Mouse(MouseEvent::CursorMoved { x, y }) => {
-                let self_bounds = layout.bounds();
-                let local_x = x - self_bounds.x;
-                let local_y = y - self_bounds.y;
-                let col = ((local_x - self.cells_size * 0.5) / self.cells_size).floor() as i32;
-                let row = ((local_y - self.cells_size * 0.5) / self.cells_size).floor() as i32;
-                let file = if self.reversed { 7 - col } else { col };
-                let rank = if self.reversed { row } else { 7 - row };
-
-                let out_of_bounds = col < 0 || col > 7 || row < 0 || row > 7;
-                if self.dnd_state.active {
-                    if self.dnd_state.start_cell.is_none() {
-                        if out_of_bounds {
-                            self.dnd_state.active = false;
-                        } else {
-                            let cell_has_player_in_turn_piece =
-                                self.cell_has_player_in_turn_piece(file as u8, rank as u8);
-                            if cell_has_player_in_turn_piece {
-                                self.dnd_state.start_cell = Some([file as u8, rank as u8]);
-                            } else {
-                                self.dnd_state.active = false;
-                            }
-                        }
-                    }
-                }
-                // We do need a different test starting the same way as the previous one.
-                // Because of the special case where dnd_state.active has been reset to false there.
-                if self.dnd_state.active {
-                    self.dnd_state.end_cell = if out_of_bounds {
-                        None
-                    } else {
-                        Some([file as u8, rank as u8])
-                    };
-                } else {
-                    self.dnd_state.end_cell = None;
-                }
+                self.handle_mouse_move(x, y, &layout);
                 Status::Captured
             }
             _ => Status::Ignored,
