@@ -1,17 +1,17 @@
 use iced_graphics::{Backend, Defaults, Primitive, Renderer};
 use iced_native::{
     layout, mouse, widget::svg::Handle, Background, Color, Element, Hasher, Layout, Length, Point,
-    Rectangle, Size, Widget, Vector
+    Rectangle, Size, Vector, Widget,
 };
 use pleco::Board;
 
 use std::collections::HashMap;
-use std::fs;    
+use std::fs;
 
 pub struct ChessBoard {
     board: Board,
     cells_size: f32,
-    piece_assets: HashMap<String, Handle>
+    piece_assets: HashMap<String, Handle>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -34,7 +34,6 @@ impl ChessBoard {
             .map(|f| f.unwrap())
             .filter(|f| f.metadata().unwrap().is_file());
         let mut res: HashMap<String, Handle> = HashMap::new();
-    
         for file in files {
             let svg = Handle::from_path(file.path());
             res.insert(
@@ -47,7 +46,47 @@ impl ChessBoard {
                 svg,
             );
         }
-    
+        res
+    }
+
+    fn get_background_primitive(&self, layout: &Layout<'_>) -> Primitive {
+        Primitive::Quad {
+            bounds: layout.bounds(),
+            background: Background::Color(Color::from_rgb8(214, 59, 96)),
+            border_radius: 0.0,
+            border_width: 0.0,
+            border_color: Color::TRANSPARENT,
+        }
+    }
+
+    fn get_cells_primitives(&self, layout: &Layout<'_>) -> Vec<Primitive> {
+        let mut res: Vec<Primitive> = Vec::new();
+
+        for row in 0..8 {
+            for col in 0..8 {
+                let is_white_cell = (row + col) % 2 == 0;
+                let background = Background::Color(if is_white_cell {
+                    Color::from_rgb8(255, 206, 158)
+                } else {
+                    Color::from_rgb8(209, 139, 71)
+                });
+
+                let x = self.cells_size * ((col as f32) + 0.5);
+                let y = self.cells_size * ((row as f32) + 0.5);
+                let position = layout.bounds().position() + Vector::new(x, y);
+                let size = Size::new(self.cells_size, self.cells_size);
+                let bounds = Rectangle::new(position, size);
+
+                res.push(Primitive::Quad {
+                    bounds,
+                    background,
+                    border_radius: 0.0,
+                    border_width: 0.0,
+                    border_color: Color::TRANSPARENT,
+                })
+            }
+        }
+
         res
     }
 }
@@ -84,39 +123,12 @@ where
         _viewport: &Rectangle,
     ) -> (Primitive, mouse::Interaction) {
         let mut res: Vec<Primitive> = Vec::new();
-        res.push(
-            Primitive::Quad {
-                bounds: layout.bounds(),
-                background: Background::Color(Color::from_rgb8(214, 59, 96)),
-                border_radius: 0.0,
-                border_width: 0.0,
-                border_color: Color::TRANSPARENT,
-            }
-        );
 
-        for row in 0..8 {
-            for col in 0..8 {
-                let is_white_cell = (row+col) %2 == 0;
-                let background = Background::Color(if is_white_cell {Color::from_rgb8(255, 206, 158)} else {Color::from_rgb8(209, 139, 71)});
-
-                let x = self.cells_size * ((col as f32) + 0.5);
-                let y = self.cells_size * ((row as f32) + 0.5);
-                let position = layout.bounds().position() + Vector::new(x, y);
-                let size = Size::new(self.cells_size, self.cells_size);
-                let bounds = Rectangle::new(position, size);
-
-                res.push(
-                    Primitive::Quad {
-                        bounds,
-                        background,
-                        border_radius: 0.0,
-                        border_width: 0.0,
-                        border_color: Color::TRANSPARENT,
-                    }
-                )
-            }
+        res.push(self.get_background_primitive(&layout));
+        for primitive in self.get_cells_primitives(&layout) {
+            res.push(primitive);
         }
-
+        
         (
             Primitive::Group { primitives: res },
             mouse::Interaction::default(),
