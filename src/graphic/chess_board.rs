@@ -246,6 +246,15 @@ impl ChessBoard {
             let rank = if self.reversed { row } else { 7 - row };
             for col in 0..8 {
                 let file = if self.reversed { 7 - col } else { col };
+
+                if self.dnd_state.active {
+                    if let Some(start_cell) = self.dnd_state.start_cell {
+                        if file == start_cell[0] && rank == start_cell[1] {
+                            continue;
+                        }
+                    }
+                }
+
                 let square = SQ(file + 8 * rank);
                 let piece = self.board.piece_at_sq(square);
                 if piece != Piece::None {
