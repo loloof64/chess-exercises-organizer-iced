@@ -117,7 +117,7 @@ impl ChessBoard {
 
         let upper_a_ordinal = 65u8;
         let digit_1_ordinal = 49u8;
-        let size = self.cells_size * 0.3;
+        let size = self.cells_size * 0.45;
         let font = Font::Default;
         let horizontal_alignment = HorizontalAlignment::Center;
         let vertical_alignment = VerticalAlignment::Center;
@@ -125,9 +125,9 @@ impl ChessBoard {
 
         for col in 0..8 {
             let content = format!("{}", (upper_a_ordinal + col) as char);
-            let x = self.cells_size * (0.8 + (col as f32));
-            let y1 = self.cells_size * 0.2f32;
-            let y2 = self.cells_size * 8.7f32;
+            let x = self.cells_size * (1.0 + (col as f32));
+            let y1 = self.cells_size * 0.25f32;
+            let y2 = self.cells_size * 8.75f32;
             let position_1 = layout.bounds().position() + Vector::new(x, y1);
             let position_2 = layout.bounds().position() + Vector::new(x, y2);
             let board_size = Size::new(self.cells_size, self.cells_size);
@@ -157,9 +157,9 @@ impl ChessBoard {
 
         for row in 0..8 {
             let content = format!("{}", (digit_1_ordinal + 7 - row) as char);
-            let y = self.cells_size * (0.8 + (row as f32));
-            let x1 = self.cells_size * 0.2f32;
-            let x2 = self.cells_size * 8.7f32;
+            let y = self.cells_size * (1.0 + (row as f32));
+            let x1 = self.cells_size * 0.25f32;
+            let x2 = self.cells_size * 8.75f32;
             let position_1 = layout.bounds().position() + Vector::new(x1, y);
             let position_2 = layout.bounds().position() + Vector::new(x2, y);
             let board_size = Size::new(self.cells_size, self.cells_size);
