@@ -1,9 +1,8 @@
-use iced::{Container, Element, Length, Sandbox, Text};
+use iced::{Container, Element, Length, Sandbox};
+
+use super::chess_board::{ChessBoard, Message};
 
 struct MainWindow {}
-
-#[derive(Debug, Clone, Copy)]
-enum Message {}
 
 impl Sandbox for MainWindow {
     type Message = Message;
@@ -21,7 +20,7 @@ impl Sandbox for MainWindow {
     }
 
     fn view(&mut self) -> Element<Message> {
-        let content = Text::new("Hello World !");
+        let content = ChessBoard::new(50f32);
 
         Container::new(content)
             .width(Length::Fill)
@@ -36,7 +35,7 @@ pub fn start()  -> iced::Result {
     let window_settings = iced::window::Settings {
         size: (800_u32, 400_u32),
         always_on_top: false,
-        resizable: false,
+        resizable: true,
         decorations: true,
         transparent: false,
         min_size: None,
