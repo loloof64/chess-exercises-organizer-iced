@@ -2,8 +2,8 @@ use iced_graphics::{
     Backend, Defaults, Font, HorizontalAlignment, Primitive, Renderer, VerticalAlignment,
 };
 use iced_native::{
-    layout, mouse, widget::svg::Handle, Background, Color, Element, Hasher, Layout, Length, Point,
-    Rectangle, Size, Vector, Widget,
+     layout, mouse, widget::svg::Handle, Background, Color, Element,
+    Hasher, Layout, Length, Point, Rectangle, Size, Vector, Widget,
 };
 use pleco::core::{sq::SQ, Piece, Player};
 use pleco::Board;
@@ -16,23 +16,22 @@ pub struct ChessBoard {
     board: Board,
     cells_size: f32,
     piece_assets: Rc<HashMap<String, Handle>>,
+    reversed: bool,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Message {}
-
 impl ChessBoard {
-    pub fn new(cells_size: f32) -> Self {
+    pub fn new(cells_size: f32, reversed: bool) -> Self {
         let piece_assets = ChessBoard::load_assets();
         Self {
             cells_size,
             piece_assets,
+            reversed,
             board: Board::start_pos(),
         }
     }
 
     fn load_assets() -> Rc<HashMap<String, Handle>> {
-        let assets_dir = format!("{}/src/graphic/merida", env!("CARGO_MANIFEST_DIR"));
+        let assets_dir = format!("{}/src/graphic/resources/merida", env!("CARGO_MANIFEST_DIR"));
         let files = fs::read_dir(assets_dir.clone())
             .unwrap_or_else(|e| panic!("Couldn't read directory {}: {}", assets_dir, e))
             .map(|f| f.unwrap())
@@ -124,7 +123,8 @@ impl ChessBoard {
         let color = Color::from_rgb8(255, 199, 0);
 
         for col in 0..8 {
-            let content = format!("{}", (upper_a_ordinal + col) as char);
+            let file = if self.reversed { 7 - col } else { col };
+            let content = format!("{}", (upper_a_ordinal + file) as char);
             let x = self.cells_size * (1.0 + (col as f32));
             let y1 = self.cells_size * 0.25f32;
             let y2 = self.cells_size * 8.75f32;
@@ -156,7 +156,8 @@ impl ChessBoard {
         }
 
         for row in 0..8 {
-            let content = format!("{}", (digit_1_ordinal + 7 - row) as char);
+            let rank = if self.reversed { row } else { 7 - row };
+            let content = format!("{}", (digit_1_ordinal + rank) as char);
             let y = self.cells_size * (1.0 + (row as f32));
             let x1 = self.cells_size * 0.25f32;
             let x2 = self.cells_size * 8.75f32;
@@ -194,9 +195,9 @@ impl ChessBoard {
         let mut res: Vec<Primitive> = Vec::new();
 
         for row in 0..8 {
-            let rank = 7 - row;
+            let rank = if self.reversed { row } else { 7 - row };
             for col in 0..8 {
-                let file = col;
+                let file = if self.reversed { 7 - col } else { col };
                 let square = SQ(file + 8 * rank);
                 let piece = self.board.piece_at_sq(square);
                 if piece != Piece::None {
@@ -226,7 +227,11 @@ impl ChessBoard {
         let bounds = Rectangle::new(position, size);
 
         let white_turn = self.board.turn() == Player::White;
-        let background = Background::Color(if white_turn {Color::WHITE} else {Color::BLACK});
+        let background = Background::Color(if white_turn {
+            Color::WHITE
+        } else {
+            Color::BLACK
+        });
 
         Primitive::Quad {
             bounds,

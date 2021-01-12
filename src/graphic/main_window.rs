@@ -1,14 +1,29 @@
-use iced::{Container, Element, Length, Sandbox};
+use iced::{
+    widget::button::{Button, State},
+    Column, Container, Element, Length, Sandbox,
+};
+use iced_native::widget::{svg::Handle, Svg};
 
-use super::chess_board::{ChessBoard, Message};
+use super::chess_board::ChessBoard;
 
-struct MainWindow {}
+#[derive(Debug, Clone, Copy)]
+enum Message {
+    ToggleBoardOrientation,
+}
+
+struct MainWindow {
+    board_reversed: bool,
+    reverse_board_button_state: State,
+}
 
 impl Sandbox for MainWindow {
     type Message = Message;
 
     fn new() -> Self {
-        Self {}
+        Self {
+            board_reversed: false,
+            reverse_board_button_state: State::new(),
+        }
     }
 
     fn title(&self) -> String {
@@ -16,11 +31,30 @@ impl Sandbox for MainWindow {
     }
 
     fn update(&mut self, message: Message) {
-        match message {}
+        match message {
+            Message::ToggleBoardOrientation => self.board_reversed = !self.board_reversed,
+        }
     }
 
     fn view(&mut self) -> Element<Message> {
-        let content = ChessBoard::new(50f32);
+        let chess_board = ChessBoard::new(45f32, self.board_reversed);
+        let reverse_svg_path = format!(
+            "{}/src/graphic/resources/reverseArrows.svg",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let reverse_svg = Handle::from_path(reverse_svg_path);
+        let reverse_board_button = Button::new(
+            &mut self.reverse_board_button_state,
+            Svg::new(reverse_svg)
+                .width(Length::Units(20))
+                .height(Length::Units(20)),
+        )
+        .on_press(Message::ToggleBoardOrientation);
+        let content = Column::new()
+            .padding(5)
+            .spacing(20)
+            .push(reverse_board_button)
+            .push(chess_board);
 
         Container::new(content)
             .width(Length::Fill)
@@ -31,7 +65,7 @@ impl Sandbox for MainWindow {
     }
 }
 
-pub fn start()  -> iced::Result {
+pub fn start() -> iced::Result {
     let window_settings = iced::window::Settings {
         size: (800_u32, 500_u32),
         always_on_top: false,
