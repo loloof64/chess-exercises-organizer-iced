@@ -1,7 +1,7 @@
-use iced_graphics::{Backend, Defaults, Primitive, Renderer};
+use iced_graphics::{Backend, Defaults, Primitive, Renderer, Font, HorizontalAlignment, VerticalAlignment};
 use iced_native::{
     layout, mouse, widget::svg::Handle, Background, Color, Element, Hasher, Layout, Length, Point,
-    Rectangle, Size, Vector, Widget,
+    Rectangle, Size, Vector, Widget
 };
 use pleco::Board;
 
@@ -89,6 +89,86 @@ impl ChessBoard {
 
         res
     }
+
+    fn get_cells_coordinates(&self, layout: &Layout<'_>) -> Vec<Primitive> {
+        let mut res: Vec<Primitive> = Vec::new();
+
+        let upper_a_ordinal = 65u8;
+        let digit_1_ordinal = 49u8;
+        let size = self.cells_size * 0.3;
+        let font = Font::Default;
+        let horizontal_alignment = HorizontalAlignment::Center;
+        let vertical_alignment = VerticalAlignment::Center;
+        let color = Color::from_rgb8(255, 199, 0);
+
+        for col in 0..8 {
+            let content = format!("{}", (upper_a_ordinal + col) as char);
+            let x = self.cells_size * (0.8 + (col as f32));
+            let y1 = self.cells_size * 0.2f32;
+            let y2 = self.cells_size * 8.7f32;
+            
+            let position_1 = layout.bounds().position() + Vector::new(x, y1);
+            let position_2 = layout.bounds().position() + Vector::new(x, y2);
+            let board_size = Size::new(self.cells_size, self.cells_size);
+            let bounds_1 = Rectangle::new(position_1, board_size);
+            let bounds_2 = Rectangle::new(position_2, board_size);
+
+            res.push(Primitive::Text{
+                content: content.clone(),
+                color,
+                size,
+                font,
+                horizontal_alignment,
+                vertical_alignment,
+                bounds: bounds_1,
+            });
+
+            res.push(Primitive::Text{
+                content,
+                color,
+                size,
+                font,
+                horizontal_alignment,
+                vertical_alignment,
+                bounds: bounds_2,
+            });
+        }
+
+        for row in 0..8 {
+            let content = format!("{}", (digit_1_ordinal + 7 - row) as char);
+            let y = self.cells_size * (0.8 + (row as f32));
+            let x1 = self.cells_size * 0.2f32;
+            let x2 = self.cells_size * 8.7f32;
+            
+            let position_1 = layout.bounds().position() + Vector::new(x1, y);
+            let position_2 = layout.bounds().position() + Vector::new(x2, y);
+            let board_size = Size::new(self.cells_size, self.cells_size);
+            let bounds_1 = Rectangle::new(position_1, board_size);
+            let bounds_2 = Rectangle::new(position_2, board_size);
+
+            res.push(Primitive::Text{
+                content: content.clone(),
+                color,
+                size,
+                font,
+                horizontal_alignment,
+                vertical_alignment,
+                bounds: bounds_1,
+            });
+
+            res.push(Primitive::Text{
+                content,
+                color,
+                size,
+                font,
+                horizontal_alignment,
+                vertical_alignment,
+                bounds: bounds_2,
+            });
+        }
+
+        res
+    }
 }
 
 impl<Message, B> Widget<Message, Renderer<B>> for ChessBoard
@@ -125,7 +205,12 @@ where
         let mut res: Vec<Primitive> = Vec::new();
 
         res.push(self.get_background_primitive(&layout));
+
         for primitive in self.get_cells_primitives(&layout) {
+            res.push(primitive);
+        }
+
+        for primitive in self.get_cells_coordinates(&layout) {
             res.push(primitive);
         }
         
