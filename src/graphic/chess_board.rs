@@ -128,7 +128,7 @@ impl ChessBoard {
                 });
                 let mut background = std_background;
 
-                if let Some([end_file , end_rank ]) = end_coordinates {
+                if let Some([end_file, end_rank]) = end_coordinates {
                     if file == end_file || rank == end_rank {
                         background = Background::Color(Color::from_rgb8(178, 46, 230));
                     }
@@ -386,11 +386,30 @@ where
                 let out_of_bounds = col < 0 || col > 7 || row < 0 || row > 7;
                 if self.dnd_state.active {
                     if self.dnd_state.start_cell.is_none() {
-                        self.dnd_state.start_cell = Some([file as u8, rank as u8]);
+                        if out_of_bounds {
+                            self.dnd_state.active = false;
+                        } else {
+                            let there_is_piece_at_square =
+                                self.board.piece_at_sq(SQ(file as u8 + 8 * rank as u8))
+                                    != Piece::None;
+                            if there_is_piece_at_square {
+                                self.dnd_state.start_cell = Some([file as u8, rank as u8]);
+                            } else {
+                                self.dnd_state.active = false;
+                            }
+                        }
                     }
                 }
-                if self.dnd_state.active  {
-                    self.dnd_state.end_cell = if out_of_bounds {None} else {Some([file as u8, rank as u8])};
+                // We do need a different test starting the same way as the previous one.
+                // Because of the special case where dnd_state.active has been reset to false there.
+                if self.dnd_state.active {
+                    self.dnd_state.end_cell = if out_of_bounds {
+                        None
+                    } else {
+                        Some([file as u8, rank as u8])
+                    };
+                } else {
+                    self.dnd_state.end_cell = None;
                 }
                 Status::Captured
             }
