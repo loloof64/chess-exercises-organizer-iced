@@ -298,6 +298,20 @@ impl ChessBoard {
             border_color: Color::TRANSPARENT,
         }
     }
+
+    fn cell_has_player_in_turn_piece(&self, file: u8, rank: u8)  -> bool {
+        let piece_at_square = self.board.piece_at_sq(SQ(file + 8*rank));
+        let white_turn = self.board.turn() == Player::White;
+        let white_pieces = vec![Piece::WhitePawn, Piece::WhiteKnight, Piece::WhiteBishop, Piece::WhiteRook, Piece::WhiteQueen, Piece::WhiteKing];
+        let black_pieces = vec![Piece::BlackPawn, Piece::BlackKnight, Piece::BlackBishop, Piece::BlackRook, Piece::BlackQueen, Piece::BlackKing];
+
+        if white_turn {
+            white_pieces.contains(&piece_at_square)
+        }
+        else {
+            black_pieces.contains(&piece_at_square)
+        }
+    }
 }
 
 impl<Message, B> Widget<Message, Renderer<B>> for ChessBoard
@@ -389,10 +403,9 @@ where
                         if out_of_bounds {
                             self.dnd_state.active = false;
                         } else {
-                            let there_is_piece_at_square =
-                                self.board.piece_at_sq(SQ(file as u8 + 8 * rank as u8))
-                                    != Piece::None;
-                            if there_is_piece_at_square {
+                            let cell_has_player_in_turn_piece =
+                                self.cell_has_player_in_turn_piece(file as u8, rank as u8);
+                            if cell_has_player_in_turn_piece {
                                 self.dnd_state.start_cell = Some([file as u8, rank as u8]);
                             } else {
                                 self.dnd_state.active = false;
