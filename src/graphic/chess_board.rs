@@ -22,6 +22,7 @@ use std::rc::Rc;
 struct DragAndDropState {
     active: bool,
     start_cell: Option<[u8; 2]>,
+    end_cell: Option<[u8; 2]>,
 }
 
 pub struct ChessBoard {
@@ -43,6 +44,7 @@ impl ChessBoard {
             dnd_state: DragAndDropState {
                 active: false,
                 start_cell: None,
+                end_cell: None,
             },
         }
     }
@@ -104,9 +106,13 @@ impl ChessBoard {
         let mut res: Vec<Primitive> = Vec::new();
 
         let mut start_coordinates: Option<[u8; 2]> = None;
+        let mut end_coordinates: Option<[u8; 2]> = None;
         if self.dnd_state.active {
             if let Some(start_cell) = self.dnd_state.start_cell {
                 start_coordinates = Some(start_cell);
+            }
+            if let Some(end_cell) = self.dnd_state.end_cell {
+                end_coordinates = Some(end_cell);
             }
         }
 
@@ -123,7 +129,10 @@ impl ChessBoard {
                 let mut background = std_background;
 
                 if Some([file as u8, rank as u8]) == start_coordinates {
-                    background = Background::Color(Color::from_rgb8(214, 59, 96));
+                    background = Background::Color(Color::from_rgb8(178, 46, 230));
+                }
+                if Some([file as u8, rank as u8]) == end_coordinates {
+                    background = Background::Color(Color::from_rgb8(112, 209, 35));
                 }
 
                 let x = self.cells_size * ((col as f32) + 0.5);
@@ -355,26 +364,20 @@ where
                 let self_bounds = layout.bounds();
                 let local_x = x - self_bounds.x;
                 let local_y = y - self_bounds.y;
+                let col = ((local_x - self.cells_size * 0.5) / self.cells_size) as i32;
+                let row = ((local_y - self.cells_size * 0.5) / self.cells_size) as i32;
+                let file = if self.reversed { 7 - col } else { col };
+                let rank = if self.reversed { row } else { 7 - row };
+
+                let out_of_bounds = col < 0 && col > 7 && row < 0 && row > 7;
                 if self.dnd_state.active {
                     if self.dnd_state.start_cell.is_none() {
-                        let col = ((local_x - self.cells_size * 0.5) / self.cells_size) as i32;
-                        let row = ((local_y - self.cells_size * 0.5) / self.cells_size) as i32;
-                        let file = if self.reversed { 7 - col } else { col };
-                        let rank = if self.reversed { row } else { 7 - row };
-
-                        let out_of_bounds = col < 0 && col > 7 && row < 0 && row > 7;
-                        if out_of_bounds {
-                            self.dnd_state.active = false;
-                        }
-
                         self.dnd_state.start_cell = Some([file as u8, rank as u8]);
                     }
                 }
-                Status::Captured
-            }
-            Event::Mouse(MouseEvent::CursorLeft) => {
-                self.dnd_state.active = false;
-                self.dnd_state.start_cell = None;
+                if self.dnd_state.active && !out_of_bounds {
+                    self.dnd_state.end_cell = Some([file as u8, rank as u8]);
+                }
                 Status::Captured
             }
             _ => Status::Ignored,
