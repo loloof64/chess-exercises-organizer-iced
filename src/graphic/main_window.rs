@@ -33,7 +33,7 @@ impl Sandbox for MainWindow {
 
 pub fn start()  -> iced::Result {
     let window_settings = iced::window::Settings {
-        size: (800_u32, 400_u32),
+        size: (800_u32, 500_u32),
         always_on_top: false,
         resizable: true,
         decorations: true,
