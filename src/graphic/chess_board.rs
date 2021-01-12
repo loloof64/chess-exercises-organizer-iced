@@ -2,8 +2,15 @@ use iced_graphics::{
     Backend, Defaults, Font, HorizontalAlignment, Primitive, Renderer, VerticalAlignment,
 };
 use iced_native::{
-     layout, mouse, widget::svg::Handle, Background, Color, Element,
-    Hasher, Layout, Length, Point, Rectangle, Size, Vector, Widget,
+    event::{Event, Status},
+    layout,
+    widget::svg::Handle,
+    Background, Clipboard, Color, Element, Hasher, Layout, Length, Point, Rectangle, Size, Vector,
+    Widget,
+    {
+        mouse,
+        mouse::{Button as MouseButton, Event as MouseEvent},
+    },
 };
 use pleco::core::{sq::SQ, Piece, Player};
 use pleco::Board;
@@ -12,11 +19,17 @@ use std::collections::HashMap;
 use std::fs;
 use std::rc::Rc;
 
+struct DragAndDropState {
+    active: bool,
+    start_cell: Option<[u8; 2]>,
+}
+
 pub struct ChessBoard {
     board: Board,
     cells_size: f32,
     piece_assets: Rc<HashMap<String, Handle>>,
     reversed: bool,
+    dnd_state: DragAndDropState,
 }
 
 impl ChessBoard {
@@ -27,11 +40,18 @@ impl ChessBoard {
             piece_assets,
             reversed,
             board: Board::start_pos(),
+            dnd_state: DragAndDropState {
+                active: false,
+                start_cell: None,
+            },
         }
     }
 
     fn load_assets() -> Rc<HashMap<String, Handle>> {
-        let assets_dir = format!("{}/src/graphic/resources/merida", env!("CARGO_MANIFEST_DIR"));
+        let assets_dir = format!(
+            "{}/src/graphic/resources/merida",
+            env!("CARGO_MANIFEST_DIR")
+        );
         let files = fs::read_dir(assets_dir.clone())
             .unwrap_or_else(|e| panic!("Couldn't read directory {}: {}", assets_dir, e))
             .map(|f| f.unwrap())
@@ -83,14 +103,28 @@ impl ChessBoard {
     fn get_cells_primitives(&self, layout: &Layout<'_>) -> Vec<Primitive> {
         let mut res: Vec<Primitive> = Vec::new();
 
+        let mut start_coordinates: Option<[u8; 2]> = None;
+        if self.dnd_state.active {
+            if let Some(start_cell) = self.dnd_state.start_cell {
+                start_coordinates = Some(start_cell);
+            }
+        }
+
         for row in 0..8 {
+            let rank = if self.reversed { row } else { 7 - row };
             for col in 0..8 {
+                let file = if self.reversed { 7 - col } else { col };
                 let is_white_cell = (row + col) % 2 == 0;
-                let background = Background::Color(if is_white_cell {
+                let std_background = Background::Color(if is_white_cell {
                     Color::from_rgb8(255, 206, 158)
                 } else {
                     Color::from_rgb8(209, 139, 71)
                 });
+                let mut background = std_background;
+
+                if Some([file as u8, rank as u8]) == start_coordinates {
+                    background = Background::Color(Color::from_rgb8(214, 59, 96));
+                }
 
                 let x = self.cells_size * ((col as f32) + 0.5);
                 let y = self.cells_size * ((row as f32) + 0.5);
@@ -296,6 +330,55 @@ where
             Primitive::Group { primitives: res },
             mouse::Interaction::default(),
         )
+    }
+
+    fn on_event(
+        &mut self,
+        event: Event,
+        layout: Layout<'_>,
+        _cursor_position: Point,
+        _messages: &mut Vec<Message>,
+        _renderer: &Renderer<B>,
+        _clipboard: Option<&dyn Clipboard>,
+    ) -> Status {
+        match event {
+            Event::Mouse(MouseEvent::ButtonPressed(MouseButton::Left)) => {
+                self.dnd_state.active = true;
+                Status::Captured
+            }
+            Event::Mouse(MouseEvent::ButtonReleased(MouseButton::Left)) => {
+                self.dnd_state.active = false;
+                self.dnd_state.start_cell = None;
+                Status::Captured
+            }
+            Event::Mouse(MouseEvent::CursorMoved { x, y }) => {
+                let self_bounds = layout.bounds();
+                let local_x = x - self_bounds.x;
+                let local_y = y - self_bounds.y;
+                if self.dnd_state.active {
+                    if self.dnd_state.start_cell.is_none() {
+                        let col = ((local_x - self.cells_size * 0.5) / self.cells_size) as i32;
+                        let row = ((local_y - self.cells_size * 0.5) / self.cells_size) as i32;
+                        let file = if self.reversed { 7 - col } else { col };
+                        let rank = if self.reversed { row } else { 7 - row };
+
+                        let out_of_bounds = col < 0 && col > 7 && row < 0 && row > 7;
+                        if out_of_bounds {
+                            self.dnd_state.active = false;
+                        }
+
+                        self.dnd_state.start_cell = Some([file as u8, rank as u8]);
+                    }
+                }
+                Status::Captured
+            }
+            Event::Mouse(MouseEvent::CursorLeft) => {
+                self.dnd_state.active = false;
+                self.dnd_state.start_cell = None;
+                Status::Captured
+            }
+            _ => Status::Ignored,
+        }
     }
 }
 
