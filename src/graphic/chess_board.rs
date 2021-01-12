@@ -364,8 +364,8 @@ where
                 let self_bounds = layout.bounds();
                 let local_x = x - self_bounds.x;
                 let local_y = y - self_bounds.y;
-                let col = ((local_x - self.cells_size * 0.5) / self.cells_size) as i32;
-                let row = ((local_y - self.cells_size * 0.5) / self.cells_size) as i32;
+                let col = ((local_x - self.cells_size * 0.5) / self.cells_size).floor() as i32;
+                let row = ((local_y - self.cells_size * 0.5) / self.cells_size).floor() as i32;
                 let file = if self.reversed { 7 - col } else { col };
                 let rank = if self.reversed { row } else { 7 - row };
 
