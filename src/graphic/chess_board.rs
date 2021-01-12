@@ -128,8 +128,13 @@ impl ChessBoard {
                 });
                 let mut background = std_background;
 
+                if let Some([end_file , end_rank ]) = end_coordinates {
+                    if file == end_file || rank == end_rank {
+                        background = Background::Color(Color::from_rgb8(178, 46, 230));
+                    }
+                }
                 if Some([file as u8, rank as u8]) == start_coordinates {
-                    background = Background::Color(Color::from_rgb8(178, 46, 230));
+                    background = Background::Color(Color::from_rgb8(214, 59, 96));
                 }
                 if Some([file as u8, rank as u8]) == end_coordinates {
                     background = Background::Color(Color::from_rgb8(112, 209, 35));
@@ -369,14 +374,14 @@ where
                 let file = if self.reversed { 7 - col } else { col };
                 let rank = if self.reversed { row } else { 7 - row };
 
-                let out_of_bounds = col < 0 && col > 7 && row < 0 && row > 7;
+                let out_of_bounds = col < 0 || col > 7 || row < 0 || row > 7;
                 if self.dnd_state.active {
                     if self.dnd_state.start_cell.is_none() {
                         self.dnd_state.start_cell = Some([file as u8, rank as u8]);
                     }
                 }
-                if self.dnd_state.active && !out_of_bounds {
-                    self.dnd_state.end_cell = Some([file as u8, rank as u8]);
+                if self.dnd_state.active  {
+                    self.dnd_state.end_cell = if out_of_bounds {None} else {Some([file as u8, rank as u8])};
                 }
                 Status::Captured
             }
