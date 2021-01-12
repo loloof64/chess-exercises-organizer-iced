@@ -5,7 +5,7 @@ use iced_native::{
     layout, mouse, widget::svg::Handle, Background, Color, Element, Hasher, Layout, Length, Point,
     Rectangle, Size, Vector, Widget,
 };
-use pleco::core::{sq::SQ, Piece};
+use pleco::core::{sq::SQ, Piece, Player};
 use pleco::Board;
 
 use std::collections::HashMap;
@@ -216,6 +216,26 @@ impl ChessBoard {
 
         res
     }
+
+    fn get_player_turn_primitive(&self, layout: &Layout<'_>) -> Primitive {
+        let x = self.cells_size * 8.55;
+        let y = self.cells_size * 8.55;
+        let border_radius = self.cells_size * 0.4;
+        let position = layout.bounds().position() + Vector::new(x, y);
+        let size = Size::new(border_radius, border_radius);
+        let bounds = Rectangle::new(position, size);
+
+        let white_turn = self.board.turn() == Player::White;
+        let background = Background::Color(if white_turn {Color::WHITE} else {Color::BLACK});
+
+        Primitive::Quad {
+            bounds,
+            background,
+            border_radius,
+            border_width: 0.0,
+            border_color: Color::TRANSPARENT,
+        }
+    }
 }
 
 impl<Message, B> Widget<Message, Renderer<B>> for ChessBoard
@@ -264,6 +284,9 @@ where
         for primitive in self.get_pieces_primitives(&layout) {
             res.push(primitive);
         }
+
+        res.push(self.get_player_turn_primitive(&layout));
+
         (
             Primitive::Group { primitives: res },
             mouse::Interaction::default(),
