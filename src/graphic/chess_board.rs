@@ -358,7 +358,8 @@ impl ChessBoard {
                     }
                 }
             }
-            self.dnd_state.moved_piece_location = Some([x - self.cells_size * 0.5f32, y - self.cells_size * 0.5f32]);
+            self.dnd_state.moved_piece_location =
+                Some([x - self.cells_size * 0.5f32, y - self.cells_size * 0.5f32]);
         }
         // We do need a different test starting the same way as the previous one.
         // Because of the special case where dnd_state.active has been reset to false there.
@@ -370,6 +371,40 @@ impl ChessBoard {
             };
         } else {
             self.dnd_state.end_cell = None;
+        }
+    }
+
+    fn handle_mouse_release(&mut self) {
+        if !self.dnd_state.active {
+            return;
+        };
+        if let Some([end_file, end_rank]) = self.dnd_state.end_cell {
+            let out_of_bounds = end_file > 7 || end_rank > 7;
+            if out_of_bounds {
+                self.dnd_state.reset();
+            } else {
+                if let Some([start_file, start_rank]) = self.dnd_state.start_cell {
+                    let ascii_lower_a = 97u8;
+                    let ascii_digit_1 = 49u8;
+
+                    let start_cell_uci = format!(
+                        "{}{}",
+                        (ascii_lower_a + start_file) as char,
+                        (ascii_digit_1 + start_rank) as char,
+                    );
+                    let end_cell_uci = format!(
+                        "{}{}",
+                        (ascii_lower_a + end_file) as char,
+                        (ascii_digit_1 + end_rank) as char
+                    );
+                    let move_uci = format!("{}{}", start_cell_uci, end_cell_uci);
+
+                    self.board.apply_uci_move(&move_uci);
+                    self.dnd_state.reset();
+                }
+            }
+        } else {
+            self.dnd_state.reset();
         }
     }
 
@@ -475,7 +510,7 @@ where
                 Status::Captured
             }
             Event::Mouse(MouseEvent::ButtonReleased(MouseButton::Left)) => {
-                self.dnd_state.reset();
+                self.handle_mouse_release();
                 Status::Captured
             }
             Event::Mouse(MouseEvent::CursorMoved { x, y }) => {
