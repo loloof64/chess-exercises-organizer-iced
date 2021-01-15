@@ -6,12 +6,14 @@ use iced_native::widget::{svg::Handle, Svg};
 
 use super::chess_board::ChessBoard;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Message {
     ToggleBoardOrientation,
+    SetPosition(String)
 }
 
 struct MainWindow {
+    board_position: String,
     board_reversed: bool,
     reverse_board_button_state: State,
 }
@@ -21,6 +23,7 @@ impl Sandbox for MainWindow {
 
     fn new() -> Self {
         Self {
+            board_position: String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
             board_reversed: false,
             reverse_board_button_state: State::new(),
         }
@@ -33,11 +36,12 @@ impl Sandbox for MainWindow {
     fn update(&mut self, message: Message) {
         match message {
             Message::ToggleBoardOrientation => self.board_reversed = !self.board_reversed,
+            Message::SetPosition(fen_string) => self.board_position = fen_string,
         }
     }
 
     fn view(&mut self) -> Element<Message> {
-        let chess_board = ChessBoard::new(45f32, self.board_reversed);
+        let chess_board = ChessBoard::new(45f32, self.board_reversed, self.board_position.clone()).on_position_changed(Box::new(|position| Message::SetPosition(position)));
         let reverse_svg_path = format!(
             "{}/src/graphic/resources/reverseArrows.svg",
             env!("CARGO_MANIFEST_DIR")

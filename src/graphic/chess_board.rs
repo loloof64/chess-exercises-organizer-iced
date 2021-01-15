@@ -19,6 +19,49 @@ use std::collections::HashMap;
 use std::fs;
 use std::rc::Rc;
 
+fn load_assets() -> Rc<HashMap<String, Handle>> {
+    let assets_dir = format!(
+        "{}/src/graphic/resources/merida",
+        env!("CARGO_MANIFEST_DIR")
+    );
+    let files = fs::read_dir(assets_dir.clone())
+        .unwrap_or_else(|e| panic!("Couldn't read directory {}: {}", assets_dir, e))
+        .map(|f| f.unwrap())
+        .filter(|f| f.metadata().unwrap().is_file());
+    let mut res: HashMap<String, Handle> = HashMap::new();
+    for file in files {
+        let svg = Handle::from_path(file.path());
+        res.insert(
+            file.path()
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap()
+                .to_string(),
+            svg,
+        );
+    }
+    Rc::new(res)
+}
+
+fn asset_name_for_piece(piece: &Piece) -> String {
+    match *piece {
+        Piece::WhitePawn => String::from("wP"),
+        Piece::WhiteKnight => String::from("wN"),
+        Piece::WhiteBishop => String::from("wB"),
+        Piece::WhiteRook => String::from("wR"),
+        Piece::WhiteQueen => String::from("wQ"),
+        Piece::WhiteKing => String::from("wK"),
+        Piece::BlackPawn => String::from("bP"),
+        Piece::BlackKnight => String::from("bN"),
+        Piece::BlackBishop => String::from("bB"),
+        Piece::BlackRook => String::from("bR"),
+        Piece::BlackQueen => String::from("bQ"),
+        Piece::BlackKing => String::from("bK"),
+        _ => String::default(),
+    }
+}
+
 struct DragAndDropState {
     active: bool,
     start_cell: Option<[u8; 2]>,
@@ -37,22 +80,31 @@ impl DragAndDropState {
     }
 }
 
-pub struct ChessBoard {
+pub struct ChessBoard<Message> {
     board: Board,
     cells_size: f32,
     piece_assets: Rc<HashMap<String, Handle>>,
     reversed: bool,
     dnd_state: DragAndDropState,
+    on_position_changed: Option<Box<dyn Fn(String) -> Message>>,
 }
 
-impl ChessBoard {
-    pub fn new(cells_size: f32, reversed: bool) -> Self {
-        let piece_assets = ChessBoard::load_assets();
+impl<Message> ChessBoard<Message> {
+    pub fn new(cells_size: f32, reversed: bool, position: String) -> Self {
+        let piece_assets = load_assets();
+        let board = Board::from_fen(position.as_str());
+        let board = match board {
+            Ok(board) => board,
+            Err(_) => {
+                println!("Wrong position : {} !", position);
+                Board::start_pos()
+            }
+        };
         Self {
             cells_size,
             piece_assets,
             reversed,
-            board: Board::start_pos(),
+            board,
             dnd_state: DragAndDropState {
                 active: false,
                 start_cell: None,
@@ -60,50 +112,13 @@ impl ChessBoard {
                 moved_piece: None,
                 moved_piece_location: None,
             },
+            on_position_changed: None,
         }
     }
 
-    fn load_assets() -> Rc<HashMap<String, Handle>> {
-        let assets_dir = format!(
-            "{}/src/graphic/resources/merida",
-            env!("CARGO_MANIFEST_DIR")
-        );
-        let files = fs::read_dir(assets_dir.clone())
-            .unwrap_or_else(|e| panic!("Couldn't read directory {}: {}", assets_dir, e))
-            .map(|f| f.unwrap())
-            .filter(|f| f.metadata().unwrap().is_file());
-        let mut res: HashMap<String, Handle> = HashMap::new();
-        for file in files {
-            let svg = Handle::from_path(file.path());
-            res.insert(
-                file.path()
-                    .file_stem()
-                    .unwrap()
-                    .to_str()
-                    .unwrap()
-                    .to_string(),
-                svg,
-            );
-        }
-        Rc::new(res)
-    }
-
-    fn asset_name_for_piece(piece: &Piece) -> String {
-        match *piece {
-            Piece::WhitePawn => String::from("wP"),
-            Piece::WhiteKnight => String::from("wN"),
-            Piece::WhiteBishop => String::from("wB"),
-            Piece::WhiteRook => String::from("wR"),
-            Piece::WhiteQueen => String::from("wQ"),
-            Piece::WhiteKing => String::from("wK"),
-            Piece::BlackPawn => String::from("bP"),
-            Piece::BlackKnight => String::from("bN"),
-            Piece::BlackBishop => String::from("bB"),
-            Piece::BlackRook => String::from("bR"),
-            Piece::BlackQueen => String::from("bQ"),
-            Piece::BlackKing => String::from("bK"),
-            _ => String::default(),
-        }
+    pub fn on_position_changed(mut self, message: Box<dyn Fn(String) -> Message>) -> Self {
+        self.on_position_changed = Some(message);
+        self
     }
 
     fn get_background_primitive(&self, layout: &Layout<'_>) -> Primitive {
@@ -272,7 +287,7 @@ impl ChessBoard {
                 let square = SQ(file + 8 * rank);
                 let piece = self.board.piece_at_sq(square);
                 if piece != Piece::None {
-                    let asset_name = ChessBoard::asset_name_for_piece(&piece);
+                    let asset_name = asset_name_for_piece(&piece);
                     let handle = self.piece_assets.clone()[asset_name.as_str()].clone();
 
                     let x = self.cells_size * ((col as f32) + 0.5);
@@ -316,7 +331,7 @@ impl ChessBoard {
     fn get_move_piece_primitive(&self) -> Option<Primitive> {
         if let Some(moved_piece) = self.dnd_state.moved_piece {
             if let Some([x, y]) = self.dnd_state.moved_piece_location {
-                let asset_name = ChessBoard::asset_name_for_piece(&moved_piece);
+                let asset_name = asset_name_for_piece(&moved_piece);
                 let handle = self.piece_assets.clone()[asset_name.as_str()].clone();
 
                 let position = Point::new(x, y);
@@ -374,37 +389,44 @@ impl ChessBoard {
         }
     }
 
-    fn handle_mouse_release(&mut self) {
+    fn handle_mouse_release(&mut self) -> bool {
         if !self.dnd_state.active {
-            return;
-        };
-        if let Some([end_file, end_rank]) = self.dnd_state.end_cell {
-            let out_of_bounds = end_file > 7 || end_rank > 7;
-            if out_of_bounds {
-                self.dnd_state.reset();
-            } else {
-                if let Some([start_file, start_rank]) = self.dnd_state.start_cell {
-                    let ascii_lower_a = 97u8;
-                    let ascii_digit_1 = 49u8;
-
-                    let start_cell_uci = format!(
-                        "{}{}",
-                        (ascii_lower_a + start_file) as char,
-                        (ascii_digit_1 + start_rank) as char,
-                    );
-                    let end_cell_uci = format!(
-                        "{}{}",
-                        (ascii_lower_a + end_file) as char,
-                        (ascii_digit_1 + end_rank) as char
-                    );
-                    let move_uci = format!("{}{}", start_cell_uci, end_cell_uci);
-
-                    self.board.apply_uci_move(&move_uci);
-                    self.dnd_state.reset();
-                }
-            }
+            false
         } else {
-            self.dnd_state.reset();
+            if let Some([end_file, end_rank]) = self.dnd_state.end_cell {
+                let out_of_bounds = end_file > 7 || end_rank > 7;
+                if out_of_bounds {
+                    self.dnd_state.reset();
+                    false
+                } else {
+                    if let Some([start_file, start_rank]) = self.dnd_state.start_cell {
+                        let ascii_lower_a = 97u8;
+                        let ascii_digit_1 = 49u8;
+
+                        let start_cell_uci = format!(
+                            "{}{}",
+                            (ascii_lower_a + start_file) as char,
+                            (ascii_digit_1 + start_rank) as char,
+                        );
+                        let end_cell_uci = format!(
+                            "{}{}",
+                            (ascii_lower_a + end_file) as char,
+                            (ascii_digit_1 + end_rank) as char
+                        );
+                        let move_uci = format!("{}{}", start_cell_uci, end_cell_uci);
+
+                        self.board.apply_uci_move(&move_uci);
+                        self.dnd_state.reset();
+
+                        true
+                    } else {
+                        false
+                    }
+                }
+            } else {
+                self.dnd_state.reset();
+                false
+            }
         }
     }
 
@@ -436,8 +458,9 @@ impl ChessBoard {
     }
 }
 
-impl<Message, B> Widget<Message, Renderer<B>> for ChessBoard
+impl<Message, B> Widget<Message, Renderer<B>> for ChessBoard<Message>
 where
+    Message: Clone,
     B: Backend,
 {
     fn width(&self) -> Length {
@@ -500,7 +523,7 @@ where
         event: Event,
         layout: Layout<'_>,
         _cursor_position: Point,
-        _messages: &mut Vec<Message>,
+        messages: &mut Vec<Message>,
         _renderer: &Renderer<B>,
         _clipboard: Option<&dyn Clipboard>,
     ) -> Status {
@@ -510,7 +533,14 @@ where
                 Status::Captured
             }
             Event::Mouse(MouseEvent::ButtonReleased(MouseButton::Left)) => {
-                self.handle_mouse_release();
+                let success = self.handle_mouse_release();
+                if success {
+                    let new_position_fen = self.board.fen();
+                    if let Some(ref message) = self.on_position_changed {
+                        let message = message(new_position_fen);
+                        messages.push(message);
+                    }
+                }
                 Status::Captured
             }
             Event::Mouse(MouseEvent::CursorMoved { x, y }) => {
@@ -522,8 +552,9 @@ where
     }
 }
 
-impl<'a, Message, B> Into<Element<'a, Message, Renderer<B>>> for ChessBoard
+impl<'a, Message, B> Into<Element<'a, Message, Renderer<B>>> for ChessBoard<Message>
 where
+    Message: 'a + Clone,
     B: Backend,
 {
     fn into(self) -> Element<'a, Message, Renderer<B>> {
