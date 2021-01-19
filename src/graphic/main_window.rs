@@ -4,7 +4,7 @@ use iced::{
 };
 use iced_native::widget::{svg::Handle, Svg};
 
-use super::chess_board::ChessBoard;
+use super::chess_board_component::ChessBoard;
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -41,7 +41,7 @@ impl Sandbox for MainWindow {
     }
 
     fn view(&mut self) -> Element<Message> {
-        let chess_board = ChessBoard::new(45f32, self.board_reversed, self.board_position.clone()).on_position_changed(Box::new(|position| Message::SetPosition(position)));
+        let chess_board = ChessBoard::new(45u16);//ChessBoard::new(45f32, self.board_reversed, self.board_position.clone()).on_position_changed(Box::new(|position| Message::SetPosition(position)));
         let reverse_svg_path = format!(
             "{}/src/graphic/resources/reverseArrows.svg",
             env!("CARGO_MANIFEST_DIR")
@@ -57,7 +57,7 @@ impl Sandbox for MainWindow {
         let content = Column::new()
             .padding(5)
             .spacing(20)
-            .push(reverse_board_button)
+            //.push(reverse_board_button)
             .push(chess_board);
 
         Container::new(content)
