@@ -5,8 +5,11 @@ use iced::{
     Canvas, Color, Element, Length, Point, Rectangle,
 };
 
-#[derive(Debug, Clone, Copy)]
-enum Message {}
+#[derive(Debug, Clone)]
+pub enum Message {
+    ToggleOrientation,
+    SetPosition(String)
+}
 
 #[derive(Debug)]
 struct GraphicElements {
@@ -34,7 +37,7 @@ impl ChessBoard {
     pub fn view(&mut self) -> Element<Message> {
         let total_size = self.cells_size * 9;
         let total_size = Length::Units(total_size);
-        Canvas::new(&mut self)
+        Canvas::new(self)
             .width(total_size)
             .height(total_size)
             .into()

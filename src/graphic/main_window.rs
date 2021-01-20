@@ -4,18 +4,19 @@ use iced::{
 };
 use iced_native::widget::{svg::Handle, Svg};
 
-use super::chess_board_component::ChessBoard;
+use super::chess_board_component::{ChessBoard, Message as BoardMessage};
 
 #[derive(Debug, Clone)]
 enum Message {
     ToggleBoardOrientation,
-    SetPosition(String)
+    SetPosition(String),
 }
 
 struct MainWindow {
     board_position: String,
     board_reversed: bool,
     reverse_board_button_state: State,
+    chess_board: ChessBoard,
 }
 
 impl Sandbox for MainWindow {
@@ -26,6 +27,7 @@ impl Sandbox for MainWindow {
             board_position: String::from("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"),
             board_reversed: false,
             reverse_board_button_state: State::new(),
+            chess_board: ChessBoard::new(45u16),
         }
     }
 
@@ -41,7 +43,8 @@ impl Sandbox for MainWindow {
     }
 
     fn view(&mut self) -> Element<Message> {
-        let chess_board = ChessBoard::new(45u16);//ChessBoard::new(45f32, self.board_reversed, self.board_position.clone()).on_position_changed(Box::new(|position| Message::SetPosition(position)));
+        //let mut chess_board = ChessBoard::new(45u16);
+        //ChessBoard::new(45f32, self.board_reversed, self.board_position.clone()).on_position_changed(Box::new(|position| Message::SetPosition(position)));
         let reverse_svg_path = format!(
             "{}/src/graphic/resources/reverseArrows.svg",
             env!("CARGO_MANIFEST_DIR")
@@ -58,7 +61,10 @@ impl Sandbox for MainWindow {
             .padding(5)
             .spacing(20)
             //.push(reverse_board_button)
-            .push(chess_board);
+            .push(self.chess_board.view().map(move |message| match message {
+                BoardMessage::ToggleOrientation => Message::ToggleBoardOrientation,
+                BoardMessage::SetPosition(pos) => Message::SetPosition(pos),
+            }));
 
         Container::new(content)
             .width(Length::Fill)
